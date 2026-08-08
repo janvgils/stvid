@@ -431,6 +431,192 @@ def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         camera.stop_video_capture()
         camera.close()
 
+# Capture images from SVBony
+def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
+evice_id, live, conf_file):
+    global logger
+    logger = setup_logging(os.getcwd())
+
+    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+    cfg.read(conf_file)
+    
+    from pysvb.camera import PySVBCameraSDK 
+    import pysvb.camera as svb
+    camera_sdk = PySVBCameraSDK()
+
+    z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
+    t1 = np.ctypeslib.as_array(t1base.get_obj())
+    z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
+    t2 = np.ctypeslib.as_array(t2base.get_obj())
+    
+    first    = True  # Array flag
+    slow_CPU = False # Performance issue flag
+
+    
+    camera_type  = "SVB"
+    gain         = cfg.getint(camera_type, "gain")
+    maxgain      = cfg.getint(camera_type, "maxgain")
+    autogain     = cfg.getboolean(camera_type, "autogain")
+    exposure     = cfg.getint(camera_type, "exposure")
+    binning      = cfg.getint(camera_type, "bin")
+    brightness   = cfg.getint(camera_type, "brightness")
+    bandwidth    = cfg.getint(camera_type, "bandwidth")
+    high_speed   = cfg.getint(camera_type, "high_speed")
+    hardware_bin = cfg.getint(camera_type, "hardware_bin")
+    sdk          = cfg.get(camera_type, "sdk")
+    try:
+        software_bin = cfg.getint(camera_type, "software_bin")
+    except configparser.Error:
+        software_bin = 0
+
+    # Initialize device
+    #svb.init(sdk)
+
+    #num_cameras = svb.get_num_cameras()
+    num_cameras = camera_sdk.get_num_of_connected_cameras()
+    print("Connected camera(s): {}".format(num_cameras) )
+    time.sleep(60)
+    if num_cameras == 0:
+        logger.error("No SVBony cameras found")
+        raise ValueError
+        sys.exit()
+
+
+    cameras_found = svb.list_cameras()  # Models names of the connected cameras
+
+    if num_cameras == 1:
+        device_id = 0
+        logger.info("Found one camera: %s" % cameras_found[0])
+    else:
+        logger.info("Found %d SVBony cameras" % num_cameras)
+        for n in range(num_cameras):
+            logger.info("    %d: %s" % (n, cameras_found[n]))
+        logger.info("Using #%d: %s" % (device_id, cameras_found[device_id]))
+
+    camera = svb.Camera(device_id)
+    camera_info = camera.get_camera_property()
+    logger.debug("SVB Camera info:")
+    for (key, value) in camera_info.items():
+        logger.debug("  %s : %s" % (key,value))
+
+    camera.set_control_value(svb.SVB_BANDWIDTHOVERLOAD, bandwidth)
+    camera.disable_dark_subtract()
+    camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
+    camera.set_control_value(svb.SVB_EXPOSURE, exposure, auto=False)
+    camera.set_control_value(svb.SVB_AUTO_MAX_GAIN, maxgain)
+    camera.set_control_value(svb.SVB_AUTO_MAX_BRIGHTNESS, 20)
+    camera.set_control_value(svb.SVB_WB_B, 99)
+    camera.set_control_value(svb.SVB_WB_R, 75)
+    camera.set_control_value(svb.SVB_GAMMA, 50)
+    camera.set_control_value(svb.SVB_BRIGHTNESS, brightness)
+    camera.set_control_value(svb.SVB_FLIP, 0)
+    try:
+        camera.set_control_value(svb.SVB_HIGH_SPEED_MODE, high_speed)
+    except:
+        pass
+    try:
+        camera.set_control_value(svb.SVB_HARDWARE_BIN, hardware_bin)
+    except:
+        pass
+    camera.set_roi(bins=binning)
+    camera.start_video_capture()
+    camera.set_image_type(svb.SVB_IMG_RAW8)
+
+    try:
+        # Fix autogain
+        if autogain:
+            while True:
+                # Get frame
+                z = camera.capture_video_frame()
+
+                # Break on no change in gain
+                settings = camera.get_control_values()
+                if gain == settings["Gain"]:
+                    break
+                gain = settings["Gain"]
+                camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
+
+        # Loop until reaching end time
+        while float(time.time()) < tend:
+            # Wait for available capture buffer to become available
+            if (image_queue.qsize() > 1):
+                logger.warning("Acquiring data faster than your CPU can process"
+)
+                slow_CPU = True
+            while (image_queue.qsize() > 1):
+                time.sleep(0.1)
+            if slow_CPU:
+                lost_video = time.time() - t
+                logger.info("Waited %.3fs for available capture buffer" % lost_v
+ideo)
+                slow_CPU = False
+
+            # Get settings
+            try:
+                settings = camera.get_control_values()
+                gain = settings["Gain"]
+                temp = settings["Temperature"] / 10
+            except:
+                gain, temp = 0, 0
+            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain
+, temp))
+
+            # Set gain
+            if autogain:
+                camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
+
+            # Get frames
+            for i in range(nz):
+                # Store start time
+                t0 = float(time.time())
+
+                # Get frame
+                z = camera.capture_video_frame()
+
+                # Apply software binning
+                if software_bin > 1:
+                    my, mx = z.shape
+                    z = cv2.resize(z, (mx // software_bin, my // software_bin))
+                
+                # Compute mid time
+                t = (float(time.time()) + t0) / 2
+
+                # Display Frame
+                if live is True:
+                    cv2.imshow("Capture", z)
+                    cv2.waitKey(1)
+
+                # Store results
+                if first:
+                    z1[:, :, i] = z
+                    t1[i] = t
+                else:
+                    z2[:, :, i] = z
+                    t2[i] = t
+
+            if first: 
+                buf = 1
+            else:
+                buf = 2
+            image_queue.put(buf)
+            logger.debug("Captured buffer %d (%dx%dx%d)" % (buf, nx, ny, nz))
+
+            # Swap flag
+            first = not first
+        reason = "Session complete"
+    except KeyboardInterrupt:
+        print()
+        reason = "Keyboard interrupt"
+    except ValueError as e:
+        logger.error("%s" % e)
+        reason = "Wrong image dimensions? Fix nx, ny in config."
+    except MemoryError as e:
+        logger.error("Capture: Memory error %s" % e)
+    finally:
+        # End capture
+        logger.info("Capture: %s - Exiting" % reason)
+        camera.stop_video_capture()
+        camera.close()
 
 def compress(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, path, device_id, conf_file):
     """ compress: Aggregate nframes of observations into a single FITS file, with statistics.
@@ -782,7 +968,13 @@ if __name__ == '__main__':
                                                  z1base, t1base, z2base, t2base,
                                                  nx, ny, nz, tend.unix,
                                                  device_id, live, conf_file))
-
+    elif camera_type == "SVB":
+        pcapture = multiprocessing.Process(target=capture_svb,
+                                           name="capture_svb",
+                                           args=(image_queue,
+                                                 z1base, t1base, z2base, t2base,
+                                                 nx, ny, nz, tend.unix,
+                                                 device_id, live, conf_file))
     try:
         # Open shutter
         if shutter:
