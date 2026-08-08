@@ -484,16 +484,12 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             print("Camera ID:", info.CameraID)
             camera_id = info.CameraID
 
-    time.sleep(60)
-
     num_cameras = svb.get_num_of_connected_cameras()
     
     if num_cameras == 0:
         logger.error("No SVBony cameras found")
         raise ValueError
         sys.exit()
-
-    
 
     cameras_found = svb.list_cameras()  # Models names of the connected cameras
 
@@ -505,6 +501,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         for n in range(num_cameras):
             logger.info("    %d: %s" % (n, cameras_found[n]))
         logger.info("Using #%d: %s" % (device_id, cameras_found[device_id]))
+
+
+    time.sleep(60)
 
     camera = svb.Camera(device_id)
     camera_info = camera.get_camera_property()
