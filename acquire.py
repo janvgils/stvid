@@ -440,7 +440,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     cfg.read(conf_file)
     
     from pysvb.camera import PySVBCameraSDK 
-    # import pysvb.camera as svb
     svb = PySVBCameraSDK()
 
     z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
@@ -450,7 +449,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     
     first    = True  # Array flag
     slow_CPU = False # Performance issue flag
-
     
     camera_type  = "SVB"
     gain         = cfg.getint(camera_type, "gain")
@@ -470,15 +468,16 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     # Initialize device
     #svb.init(sdk)
-    connected = sdk.get_num_of_connected_cameras()
-    print("SDK VERSION:", sdk.sdk_version)
+
+    connected = svb.get_num_of_connected_cameras()
+    print("SDK VERSION:", svb.sdk_version)
     print("Connected camera(s): {}".format(connected) )
     camera_id = -1
 
     if connected > 0:
         for i in range(0, connected):
             separator()
-            info = sdk.get_camera_info(i)
+            info = svb.get_camera_info(i)
             print("Friendly name:", info.FriendlyName)
             print("Port type:", info.PortType)
             print("Serial number",info.CameraSN)
