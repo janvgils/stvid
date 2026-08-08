@@ -476,7 +476,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     if connected > 0:
         for i in range(0, connected):
-            separator()
             info = svb.get_camera_info(i)
             print("Friendly name:", info.FriendlyName)
             print("Port type:", info.PortType)
@@ -484,7 +483,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             print("Device ID:", hex(info.DeviceID))
             print("Camera ID:", info.CameraID)
             camera_id = info.CameraID
-            separator()
 
     time.sleep(60)
 
