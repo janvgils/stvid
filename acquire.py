@@ -433,7 +433,7 @@ def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
 # Capture images from SVBony
 def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
-evice_id, live, conf_file):
+device_id, live, conf_file):
     global logger
     logger = setup_logging(os.getcwd())
 
