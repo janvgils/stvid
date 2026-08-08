@@ -492,6 +492,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         sys.exit()
 
     #cameras_found = svb.list_cameras()  # Models names of the connected cameras
+    cameras_found = svb.get_camera_info(camera_id)  # Models names of the connected cameras
 
     if num_cameras == 1:
         device_id = 0
