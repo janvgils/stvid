@@ -438,10 +438,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     cfg.read(conf_file)
-    
-    import pysvb.camera as svb
-    #from pysvb.camera import PySVBCameraSDK 
-    #svb = PySVBCameraSDK()
 
     z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
     t1 = np.ctypeslib.as_array(t1base.get_obj())
@@ -469,6 +465,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     # Initialize device
     #svb.init(sdk)
+    from pysvb.camera import PySVBCameraSDK 
+    svb = PySVBCameraSDK()
 
     connected = svb.get_num_of_connected_cameras()
     print("SDK VERSION:", svb.sdk_version)
@@ -494,6 +492,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     #cameras_found = svb.list_cameras()  # Models names of the connected cameras
     cameras_found = svb.get_camera_info(0)  # Models names of the connected cameras
+    print(cameras_found)
+    
+    time.sleep(60)
 
     if num_cameras == 1:
         device_id = 0
@@ -504,8 +505,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             logger.info("    %d: %s" % (n, cameras_found[n]))
         logger.info("Using #%d: %s" % (device_id, cameras_found[device_id]))
 
-
-    time.sleep(60)
 
     camera = svb.Camera(device_id)
     camera_info = camera.get_camera_property()
