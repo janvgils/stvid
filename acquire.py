@@ -441,7 +441,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     
     from pysvb.camera import PySVBCameraSDK 
     import pysvb.camera as svb
-    camera_sdk = PySVBCameraSDK()
+    svbsdk = PySVBCameraSDK()
 
     z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
     t1 = np.ctypeslib.as_array(t1base.get_obj())
@@ -472,7 +472,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     #svb.init(sdk)
 
     #num_cameras = svb.get_num_cameras()
-    num_cameras = camera_sdk.get_num_of_connected_cameras()
+    num_cameras = svbsdk.get_num_of_connected_cameras()
     print("Connected camera(s): {}".format(num_cameras) )
     time.sleep(60)
     if num_cameras == 0:
