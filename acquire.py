@@ -469,13 +469,13 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     svb = PySVBCameraSDK()
 
     connected = svb.get_num_of_connected_cameras()
-    print("SDK VERSION:", svb.sdk_version)
     print("Connected camera(s): {}".format(connected) )
     camera_id = -1
 
     if connected > 0:
         for i in range(0, connected):
             info = svb.get_camera_info(i)
+            print("SDK Version:", svb.sdk_version)
             print("Friendly name:", info.FriendlyName)
             print("Port type:", info.PortType)
             print("Serial number",info.CameraSN)
@@ -491,9 +491,11 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         sys.exit()
 
     #cameras_found = svb.list_cameras()  # Models names of the connected cameras
-    cameras_found = svb.get_camera_info(0)  # Models names of the connected cameras
+    info = svb.get_camera_info(0)
+    camera_id = info.CameraID
+    cameras_found = info.CameraID  # Models names of the connected cameras
     print(cameras_found)
-    
+
     time.sleep(60)
 
     if num_cameras == 1:
