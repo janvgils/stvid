@@ -473,7 +473,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     #num_cameras = svb.get_num_cameras()
     num_cameras = svbsdk.get_num_of_connected_cameras()
+    info_cameras = svbsdk.camera_info()
     print("Connected camera(s): {}".format(num_cameras) )
+    print("Camera(s) info: {}".format(info_cameras) )
     time.sleep(60)
     if num_cameras == 0:
         logger.error("No SVBony cameras found")
