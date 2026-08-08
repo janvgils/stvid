@@ -440,8 +440,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     cfg.read(conf_file)
     
     from pysvb.camera import PySVBCameraSDK 
-    import pysvb.camera as svb
-    svbsdk = PySVBCameraSDK()
+    # import pysvb.camera as svb
+    svb = PySVBCameraSDK()
 
     z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
     t1 = np.ctypeslib.as_array(t1base.get_obj())
@@ -470,18 +470,33 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     # Initialize device
     #svb.init(sdk)
+    connected = sdk.get_num_of_connected_cameras()
+    print("SDK VERSION:", sdk.sdk_version)
+    print("Connected camera(s): {}".format(connected) )
+    camera_id = -1
 
-    #num_cameras = svb.get_num_cameras()
-    num_cameras = svbsdk.get_num_of_connected_cameras()
-    info_cameras = svbsdk.get_camera_info()
-    print("Connected camera(s): {}".format(num_cameras) )
-    print("Camera(s) info: {}".format(info_cameras) )
+    if connected > 0:
+        for i in range(0, connected):
+            separator()
+            info = sdk.get_camera_info(i)
+            print("Friendly name:", info.FriendlyName)
+            print("Port type:", info.PortType)
+            print("Serial number",info.CameraSN)
+            print("Device ID:", hex(info.DeviceID))
+            print("Camera ID:", info.CameraID)
+            camera_id = info.CameraID
+            separator()
+
     time.sleep(60)
+
+    num_cameras = svb.get_num_of_connected_cameras()
+    
     if num_cameras == 0:
         logger.error("No SVBony cameras found")
         raise ValueError
         sys.exit()
 
+    
 
     cameras_found = svb.list_cameras()  # Models names of the connected cameras
 
