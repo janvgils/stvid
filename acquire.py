@@ -34,8 +34,7 @@ def setup_logging(path):
     return logger
 
 # Capture images from pi
-def capture_pi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, de
-vice_id, live, conf_file):
+def capture_pi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
     global logger
     logger = setup_logging(os.getcwd())
 
@@ -64,8 +63,7 @@ vice_id, live, conf_file):
     camera.iso = 0
     # set the camea settings
     camera.framerate = cfg.getfloat(camera_type, "framerate")
-    camera.awb_gains = (cfg.getfloat(camera_type, "awb_gain_red"), cfg.getfloat(
-camera_type, "awb_gain_blue"))    
+    camera.awb_gains = (cfg.getfloat(camera_type, "awb_gain_red"), cfg.getfloat(camera_type, "awb_gain_blue"))    
     camera.analog_gain = cfg.getfloat(camera_type, "analog_gain")
     camera.digital_gain = cfg.getfloat(camera_type, "digital_gain")
     camera.shutter_speed = cfg.getint(camera_type, "exposure")
@@ -79,26 +77,22 @@ camera_type, "awb_gain_blue"))
         while float(time.time()) < tend:
             # Wait for available capture buffer to become available
             if (image_queue.qsize() > 1):
-                logger.warning("Acquiring data faster than your CPU can process"
-)
+                logger.warning("Acquiring data faster than your CPU can process")
                 slow_CPU = True
             while (image_queue.qsize() > 1):
                 time.sleep(0.1)
             if slow_CPU:
                 lost_video = time.time() - t
-                logger.info("Waited %.3fs for available capture buffer" % lost_v
-ideo)
+                logger.info("Waited %.3fs for available capture buffer" % lost_video)
                 slow_CPU = False
 
             # Get frames
             i = 0
-            for frameA in camera.capture_continuous(rawCapture, format="bgr", us
-e_video_port=True):
+            for frameA in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
                             
                 # Store start time
                 t0 = float(time.time())                
-                # grab the raw NumPy array representing the image, then initiali
-ze the timestamp                
+                # grab the raw NumPy array representing the image, then initialize the timestamp                
                 frame = frameA.array
                                     
                 # Compute mid time
@@ -156,8 +150,7 @@ ze the timestamp
 
 
 # Capture images from cv2
-def capture_cv2(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
-evice_id, live, conf_file):
+def capture_cv2(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
     global logger
     logger = setup_logging(os.getcwd())
 
@@ -195,15 +188,13 @@ evice_id, live, conf_file):
         while float(time.time()) < tend:
             # Wait for available capture buffer to become available
             if (image_queue.qsize() > 1):
-                logger.warning("Acquiring data faster than your CPU can process"
-)
+                logger.warning("Acquiring data faster than your CPU can process")
                 slow_CPU = True
             while (image_queue.qsize() > 1):
                 time.sleep(0.1)
             if slow_CPU:
                 lost_video = time.time() - t
-                logger.info("Waited %.3fs for available capture buffer" % lost_v
-ideo)
+                logger.info("Waited %.3fs for available capture buffer" % lost_video)
                 slow_CPU = False
 
             # Get frames
@@ -226,8 +217,7 @@ ideo)
                     # Apply software binning
                     if software_bin > 1:
                         my, mx = z.shape
-                        z = cv2.resize(z, (mx // software_bin, my // software_bi
-n))
+                        z = cv2.resize(z, (mx // software_bin, my // software_bin))
                     
                     # Display Frame
                     if live is True:
@@ -265,8 +255,7 @@ n))
 
 
 # Capture images from ASI
-def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
-evice_id, live, conf_file):
+def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
     global logger
     logger = setup_logging(os.getcwd())
 
@@ -367,15 +356,13 @@ evice_id, live, conf_file):
         while float(time.time()) < tend:
             # Wait for available capture buffer to become available
             if (image_queue.qsize() > 1):
-                logger.warning("Acquiring data faster than your CPU can process"
-)
+                logger.warning("Acquiring data faster than your CPU can process")
                 slow_CPU = True
             while (image_queue.qsize() > 1):
                 time.sleep(0.1)
             if slow_CPU:
                 lost_video = time.time() - t
-                logger.info("Waited %.3fs for available capture buffer" % lost_v
-ideo)
+                logger.info("Waited %.3fs for available capture buffer" % lost_video)
                 slow_CPU = False
 
             # Get settings
@@ -385,8 +372,7 @@ ideo)
                 temp = settings["Temperature"] / 10
             except:
                 gain, temp = 0, 0
-            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain
-, temp))
+            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain, temp))
 
             # Set gain
             if autogain:
@@ -446,8 +432,7 @@ ideo)
         camera.close()
 
 # Capture images from SVBony
-def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
-evice_id, live, conf_file):
+def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
     global logger
     logger = setup_logging(os.getcwd())
 
@@ -554,15 +539,13 @@ evice_id, live, conf_file):
         while float(time.time()) < tend:
             # Wait for available capture buffer to become available
             if (image_queue.qsize() > 1):
-                logger.warning("Acquiring data faster than your CPU can process"
-)
+                logger.warning("Acquiring data faster than your CPU can process")
                 slow_CPU = True
             while (image_queue.qsize() > 1):
                 time.sleep(0.1)
             if slow_CPU:
                 lost_video = time.time() - t
-                logger.info("Waited %.3fs for available capture buffer" % lost_v
-ideo)
+                logger.info("Waited %.3fs for available capture buffer" % lost_video)
                 slow_CPU = False
 
             # Get settings
@@ -572,8 +555,7 @@ ideo)
                 temp = settings["Temperature"] / 10
             except:
                 gain, temp = 0, 0
-            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain
-, temp))
+            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain, temp))
 
             # Set gain
             if autogain:
@@ -632,18 +614,15 @@ ideo)
         camera.stop_video_capture()
         camera.close()
 
-def compress(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, path
-, device_id, conf_file):
-    """ compress: Aggregate nframes of observations into a single FITS file, wit
-h statistics.
+def compress(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, path, device_id, conf_file):
+    """ compress: Aggregate nframes of observations into a single FITS file, with statistics.
 
         ImageHDU[0]: mean pixel value nframes         (zmax)
         ImageHDU[1]: standard deviation of nframes    (zstd)
         ImageHDU[2]: maximum pixel value of nframes   (zmax)
         ImageHDU[3]: maximum pixel value frame number (znum)
 
-    Also updates a [observations_path]/control/state.txt for interfacing with sa
-tttools/runsched and sattools/slewto
+    Also updates a [observations_path]/control/state.txt for interfacing with satttools/runsched and sattools/slewto
     """
     global logger
     logger = setup_logging(os.getcwd())
@@ -662,8 +641,7 @@ tttools/runsched and sattools/slewto
         try:
             os.makedirs(controlpath)
         except PermissionError:
-            logger.error("Can not create control path directory: %s" % controlpa
-th)
+            logger.error("Can not create control path directory: %s" % controlpath)
             raise
     if not os.path.exists(os.path.join(controlpath, "position.txt")):
         with open(os.path.join(controlpath, "position.txt"), "w") as fp:
@@ -690,8 +668,7 @@ th)
 
                 # Get obsid
                 trestart = time.gmtime()
-                obsid = "%s_%d/%s" % (time.strftime("%Y%m%d", trestart), device_
-id, time.strftime("%H%M%S", trestart))
+                obsid = "%s_%d/%s" % (time.strftime("%Y%m%d", trestart), device_id, time.strftime("%H%M%S", trestart))
                 filepath = os.path.join(path, obsid)
                 logger.info("Storing files in %s" % filepath)
 
@@ -700,8 +677,7 @@ id, time.strftime("%H%M%S", trestart))
                     try:
                         os.makedirs(filepath)
                     except PermissionError:
-                        logger.error("Can not create output directory: %s" % fil
-epath)
+                        logger.error("Can not create output directory: %s" % filepath)
                         raise
 
                 # Get mount position
@@ -735,8 +711,7 @@ epath)
 
             # Format time
             nfd = "%s.%03d" % (time.strftime("%Y-%m-%dT%T",
-                                             time.gmtime(t[0])), int((t[0] - np.
-floor(t[0])) * 1000))
+                                             time.gmtime(t[0])), int((t[0] - np.floor(t[0])) * 1000))
             t0 = Time(nfd, format="isot")
             dt = t - t[0]
 
@@ -801,11 +776,9 @@ floor(t[0])) * 1000))
             hdu = fits.PrimaryHDU(data=np.array([zavg, zstd, zmax, znum]),
                                   header=hdr)
             hdu.writeto(os.path.join(filepath, ftemp))
-            os.rename(os.path.join(filepath, ftemp), os.path.join(filepath, fnam
-e))
+            os.rename(os.path.join(filepath, ftemp), os.path.join(filepath, fname))
 
-            logger.info("Compressed %s in %.2f sec" % (fname, time.time() - tsta
-rt))
+            logger.info("Compressed %s in %.2f sec" % (fname, time.time() - tstart))
 
             # Exit on end of capture
             if t[-1] > tend:
@@ -839,8 +812,7 @@ if __name__ == '__main__':
                              nargs="?",
                              action="store", 
                              default=False,
-                             help="Testing mode - Start capturing immediately fo
-r (optional) seconds",
+                             help="Testing mode - Start capturing immediately for (optional) seconds",
                              metavar="s")
     conf_parser.add_argument("-l", "--live", action="store_true",
                              help="Display live image while capturing")
@@ -927,10 +899,8 @@ r (optional) seconds",
             aimpoint_az, aimpoint_alt, aimpoint_height = None, None, None
 
         # Get logic
-        action, wait_time, tend, state = observe_logic(tnow, loc, refalt_set, re
-falt_rise,
-                                                       aimpoint_az, aimpoint_alt
-, aimpoint_height)
+        action, wait_time, tend, state = observe_logic(tnow, loc, refalt_set, refalt_rise,
+                                                       aimpoint_az, aimpoint_alt, aimpoint_height)
 
         # Wait for observation start
         logger.info(state)
