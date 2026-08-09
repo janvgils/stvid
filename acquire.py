@@ -457,14 +457,11 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     bandwidth    = cfg.getint(camera_type, "bandwidth")
     high_speed   = cfg.getint(camera_type, "high_speed")
     hardware_bin = cfg.getint(camera_type, "hardware_bin")
-    sdk          = cfg.get(camera_type, "sdk")
     try:
         software_bin = cfg.getint(camera_type, "software_bin")
     except configparser.Error:
         software_bin = 0
 
-    # Initialize device
-    #svb.init(sdk)
     from pysvb.camera import PySVBCameraSDK 
     svb = PySVBCameraSDK()
 
