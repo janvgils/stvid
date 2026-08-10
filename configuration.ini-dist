@@ -6,7 +6,7 @@ longitude = 12.3456       # Longitude of location (decimal degrees)
 height = 123              # Height of location (meters)
 
 [Setup]
-camera_type = ASI                 # CV2 or ASI or PI
+camera_type = ASI                 # PI, CV2, ASI or SVB
 tracking_mount = False
 alt_sunset = -6.0                 # Solar altitude at sunset
 alt_sunrise = -6.0                # Solar altitude at sunrise
