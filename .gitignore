@@ -1,6 +1,8 @@
 # Python compiled objects
 *.pyc
 
+svb-function.py
+
 # IDE files
 *~
 settings.json
