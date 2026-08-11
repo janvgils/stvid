@@ -678,11 +678,10 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             % image_type_name
         )
 
-    if image_type not in props.SupportedVideoFormat:
-        raise ValueError(
-            "SVBONY camera does not support %s"
-            % image_type_name
-        )
+    logger.info(
+        "Setting SVBONY image type to %s",
+        image_type
+    )
 
     camera_sdk.set_output_image_type(
         camera_id,
