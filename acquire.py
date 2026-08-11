@@ -625,6 +625,8 @@ def capture_svb_disable(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz,
         camera.stop_video_capture()
         camera.close()
 
+# SVBony Capture function.
+
 def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
 
     global logger
@@ -646,6 +648,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     camera_type = "SVB"
 
     gain = cfg.getint(camera_type, "gain")
+    print(gain)
+    time.sleep(60)
     autogain = cfg.getboolean(camera_type, "autogain")
 
     # IMPORTANT:
