@@ -638,6 +638,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     cfg.read(conf_file)
  
     from pysvb.camera import (PySVBCameraSDK, SVB_CONTROL_TYPE, SVB_IMG_TYPE, SVB_ROI_FORMAT,)
+
+    camera_sdk = PySVBCameraSDK()
  
     first = True
     slow_CPU = False
@@ -695,8 +697,6 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     # exposure * 2 + 500 ms
     #
     wait_ms = cfg.getint(camera_type, "wait_ms", fallback=max(1000, int(exposure / 1000 * 2 + 500)))
-
-    camera_sdk = PySVBCameraSDK()
 
     logger.info(
         "SVBONY SDK version: %s",
