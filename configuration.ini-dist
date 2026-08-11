@@ -48,7 +48,7 @@ high_speed = 0          # High speed mode (0 for False, 1 for True)
 hardware_bin = 0        # Hardware binning (0 for False, 1 for True)
 bin = 1                 # ASI software binning factor (1: 1x2, 2: 2x2 etc)
 software_bin = 0        # STVID software binning factor (1: 1x1, 2: 2x2 etc)
-image_type = RAW16      # RAW8 or RAW16
+image_type = Y16        # Y8 or Y16
 wait_ms = 1000          # Timeout for get_video_data(), milliseconds
 
 [PI]
