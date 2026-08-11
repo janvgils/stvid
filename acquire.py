@@ -629,6 +629,8 @@ def capture_svb_disable(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz,
 
 def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
 
+    camera_type = "SVB"
+    
     global logger
     logger = setup_logging(os.getcwd())
 
@@ -645,11 +647,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
     t2 = np.ctypeslib.as_array(t2base.get_obj())
 
-    camera_type = "SVB"
-
     gain = cfg.getint(camera_type, "gain")
-    print(gain)
-    time.sleep(60)
     autogain = cfg.getboolean(camera_type, "autogain")
 
     # IMPORTANT:
@@ -658,20 +656,11 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     binning = cfg.getint(camera_type, "bin")
 
-    brightness = cfg.getint(
-        camera_type, "brightness", fallback=0
-    )
-
-    software_bin = cfg.getint(
-        camera_type, "software_bin", fallback=0
-    )
+    brightness = cfg.getint(camera_type, "brightness", fallback=0)
+    software_bin = cfg.getint(camera_type, "software_bin", fallback=0)
 
     # RAW8 or RAW16.
-    image_type_name = cfg.get(
-        camera_type,
-        "image_type",
-        fallback="RAW8"
-    ).upper()
+    image_type_name = cfg.get(camera_type, "image_type", fallback="RAW8").upper()
 
     # Maximum time get_video_data() waits for a frame.
     #
@@ -679,11 +668,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     #
     # exposure * 2 + 500 ms
     #
-    wait_ms = cfg.getint(
-        camera_type,
-        "wait_ms",
-        fallback=max(1000, int(exposure / 1000 * 2 + 500))
-    )
+    wait_ms = cfg.getint(camera_type, "wait_ms", fallback=max(1000, int(exposure / 1000 * 2 + 500)))
 
     camera_sdk = PySVBCameraSDK()
 
