@@ -661,6 +661,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     # Set image type
 
+    image_type_name = cfg.get(camera_type, "image_type", fallback="Y8").upper()
+
     if image_type_name in ("Y8", "RAW8"):
         image_type = SVB_IMG_TYPE.SVB_IMG_Y8
         bytes_per_pixel = 1
