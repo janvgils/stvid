@@ -649,7 +649,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
     t2 = np.ctypeslib.as_array(t2base.get_obj())
 
-    camera_id = cfg.getint(device_id, "camera_id")
+    camera_id = cfg.getint(camera_type, "camera_id")
     gain = cfg.getint(camera_type, "gain")
     autogain = cfg.getboolean(camera_type, "autogain")
 
