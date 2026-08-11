@@ -649,47 +649,15 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
     t2 = np.ctypeslib.as_array(t2base.get_obj())
 
-    camera_id = cfg.getint(camera_type, "device_id")
+    # camera_id = cfg.getint(camera_type, "device_id")
     gain = cfg.getint(camera_type, "gain")
     autogain = cfg.getboolean(camera_type, "autogain")
-
-    # IMPORTANT:
-    # SVBONY exposure is specified in microseconds.
     exposure = cfg.getint(camera_type, "exposure")
-
     binning = cfg.getint(camera_type, "bin")
-
     brightness = cfg.getint(camera_type, "brightness", fallback=0)
     software_bin = cfg.getint(camera_type, "software_bin", fallback=0)
 
-    # Set image type
 
-    image_type_name = cfg.get(camera_type, "image_type", fallback="0")
-
-    if image_type_name in ("Y8", "RAW8"):
-        image_type = SVB_IMG_TYPE.SVB_IMG_Y8
-        bytes_per_pixel = 1
-
-    elif image_type_name in ("Y16", "RAW16"):
-        image_type = SVB_IMG_TYPE.SVB_IMG_Y16
-        bytes_per_pixel = 2
-
-    else:
-        raise ValueError(
-            "Unsupported SVBONY image_type: %s. "
-            "Use Y8 or Y16."
-            % image_type_name
-        )
-
-    logger.info(
-        "Setting SVBONY image type to %s",
-        image_type
-    )
-
-    camera_sdk.set_output_image_type(
-        camera_id,
-        image_type
-    )
 
     # Maximum time get_video_data() waits for a frame.
     #
@@ -742,6 +710,35 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         cameras_found[device_id].FriendlyName
     )
 
+    # Set image type
+
+    image_type_name = cfg.get(camera_type, "image_type", fallback="0")
+
+    if image_type_name in ("Y8", "RAW8"):
+        image_type = SVB_IMG_TYPE.SVB_IMG_Y8
+        bytes_per_pixel = 1
+
+    elif image_type_name in ("Y16", "RAW16"):
+        image_type = SVB_IMG_TYPE.SVB_IMG_Y16
+        bytes_per_pixel = 2
+
+    else:
+        raise ValueError(
+            "Unsupported SVBONY image_type: %s. "
+            "Use Y8 or Y16."
+            % image_type_name
+        )
+
+    logger.info(
+        "Setting SVBONY image type to %s",
+        image_type
+    )
+
+    camera_sdk.set_output_image_type(
+        camera_id,
+        image_type
+    )
+    
     camera_sdk.open_camera(camera_id)
 
     try:
