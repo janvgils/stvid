@@ -662,8 +662,8 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
     # Set image type
 
     if image_type_name in ("Y8", "RAW8"):
-    image_type = SVB_IMG_TYPE.SVB_IMG_Y8
-    bytes_per_pixel = 1
+        image_type = SVB_IMG_TYPE.SVB_IMG_Y8
+        bytes_per_pixel = 1
 
     elif image_type_name in ("Y16", "RAW16"):
         image_type = SVB_IMG_TYPE.SVB_IMG_Y16
@@ -681,6 +681,11 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             "SVBONY camera does not support %s"
             % image_type_name
         )
+
+    camera_sdk.set_output_image_type(
+        camera_id,
+        image_type
+    )
 
     # Maximum time get_video_data() waits for a frame.
     #
