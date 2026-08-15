@@ -1138,7 +1138,21 @@ def capture_svb(
         except Exception:
 
             pass
+        # --------------------------------------------------------
+        # Close live window
+        # --------------------------------------------------------
 
+        if live is True:
+
+            try:
+
+                cv2.destroyWindow(
+                    "Capture"
+                )
+
+            except Exception:
+
+                pass
 
 def compress(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, path, device_id, conf_file):
     """ compress: Aggregate nframes of observations into a single FITS file, with statistics.
