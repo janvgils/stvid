@@ -39,24 +39,24 @@ nx = 640                # Camera horizontal pixel count
 ny = 480                # Camera vertical pixel count
 nframes = 100           # Number of frames for each image
 gain = 100              # Camera gain
-autogain = false
-exposure = 10000        # Exposure time in microseconds
+autogain = false        # Use autogain
+exposure = 10000        # Exposure time in us
 bin = 1                 # Software binning factor
 software_bin = 0        # STVID software binning factor (1: 1x1, 2: 2x2 etc)
 image_type = Y16        # Image type Y8 or Y16 for SV305M Pro
-wait_ms = 1000
+wait_ms = 500           # wait value (ms), recommend value is exposure*2+500ms
 
 [PI]
 device_id = 0           # Device ID
 nx =  800               # Camera horizontal pixel count
 ny =  600               # Camera vertical pixel count
 nframes = 100           # Number of frames for each image
-framerate = 5		# Take 5 frames per second
-exposure = 200000	# Exposure time in us
-awb_gain_red = 2	# Gain for red.
-awb_gain_blue = 2.3	# Gain for blue
-analog_gain = 16	# Analog gain
-digital_gain = 64	# Digital gain
+framerate = 5		    # Take 5 frames per second
+exposure = 200000	    # Exposure time in us
+awb_gain_red = 2	    # Gain for red.
+awb_gain_blue = 2.3	    # Gain for blue
+analog_gain = 16	    # Analog gain
+digital_gain = 64	    # Digital gain
 
 [CV2]
 device_id = 0           # Device ID
