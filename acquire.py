@@ -432,322 +432,235 @@ def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         camera.close()
 
 # Capture images from SVBony
-def capture_svb_disable(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
+
+def capture_svb(
+        image_queue,
+        z1base, t1base,
+        z2base, t2base,
+        nx, ny, nz,
+        tend,
+        device_id,
+        live,
+        conf_file):
+
     global logger
     logger = setup_logging(os.getcwd())
 
-    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+    import time
+    import cv2
+    import numpy as np
+    import configparser
+
+    from pysvb.camera import (
+        PySVBCameraSDK,
+        SVB_CONTROL_TYPE,
+        SVB_IMG_TYPE,
+        SVB_ROI_FORMAT,
+    )
+
+    # ------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------
+
+    cfg = configparser.ConfigParser(
+        inline_comment_prefixes=("#", ";")
+    )
     cfg.read(conf_file)
 
-    z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
-    t1 = np.ctypeslib.as_array(t1base.get_obj())
-    z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
-    t2 = np.ctypeslib.as_array(t2base.get_obj())
-    
-    first    = True  # Array flag
-    slow_CPU = False # Performance issue flag
-    
-    camera_type  = "SVB"
-    gain         = cfg.getint(camera_type, "gain")
-    maxgain      = cfg.getint(camera_type, "maxgain")
-    autogain     = cfg.getboolean(camera_type, "autogain")
-    exposure     = cfg.getint(camera_type, "exposure")
-    binning      = cfg.getint(camera_type, "bin")
-    brightness   = cfg.getint(camera_type, "brightness")
-    bandwidth    = cfg.getint(camera_type, "bandwidth")
-    high_speed   = cfg.getint(camera_type, "high_speed")
-    hardware_bin = cfg.getint(camera_type, "hardware_bin")
-    try:
-        software_bin = cfg.getint(camera_type, "software_bin")
-    except configparser.Error:
-        software_bin = 0
-
-    from pysvb.camera import PySVBCameraSDK 
-    svb = PySVBCameraSDK()
-
-    connected = svb.get_num_of_connected_cameras()
-    print("Connected camera(s): {}".format(connected) )
-    camera_id = -1
-
-    if connected > 0:
-        for i in range(0, connected):
-            info = svb.get_camera_info(i)
-            print("SDK Version:", svb.sdk_version)
-            print("Friendly name:", info.FriendlyName)
-            print("Port type:", info.PortType)
-            print("Serial number",info.CameraSN)
-            print("Device ID:", hex(info.DeviceID))
-            print("Camera ID:", info.CameraID)
-            camera_id = info.CameraID
-
-    num_cameras = svb.get_num_of_connected_cameras()
-    
-    if num_cameras == 0:
-        logger.error("No SVBony cameras found")
-        raise ValueError
-        sys.exit()
-
-    #cameras_found = svb.list_cameras()  # Models names of the connected cameras
-    info = svb.get_camera_info(0)
-    camera_id = info.CameraID
-    cameras_found = info.CameraID  # Models names of the connected cameras
-    
-    if num_cameras == 1:
-        device_id = 0
-        logger.info("Found one camera: %s" % cameras_found[0])
-    else:
-        logger.info("Found %d SVBony cameras" % num_cameras)
-        for n in range(num_cameras):
-            logger.info("    %d: %s" % (n, cameras_found[n]))
-        logger.info("Using #%d: %s" % (device_id, cameras_found[device_id]))
-
-    time.sleep(60)
-
-    camera = svb.Camera(device_id)
-    camera_info = camera.get_camera_property()
-    logger.debug("SVB Camera info:")
-    for (key, value) in camera_info.items():
-        logger.debug("  %s : %s" % (key,value))
-
-    camera.set_control_value(svb.SVB_BANDWIDTHOVERLOAD, bandwidth)
-    camera.disable_dark_subtract()
-    camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
-    camera.set_control_value(svb.SVB_EXPOSURE, exposure, auto=False)
-    camera.set_control_value(svb.SVB_AUTO_MAX_GAIN, maxgain)
-    camera.set_control_value(svb.SVB_AUTO_MAX_BRIGHTNESS, 20)
-    camera.set_control_value(svb.SVB_WB_B, 99)
-    camera.set_control_value(svb.SVB_WB_R, 75)
-    camera.set_control_value(svb.SVB_GAMMA, 50)
-    camera.set_control_value(svb.SVB_BRIGHTNESS, brightness)
-    camera.set_control_value(svb.SVB_FLIP, 0)
-    try:
-        camera.set_control_value(svb.SVB_HIGH_SPEED_MODE, high_speed)
-    except:
-        pass
-    try:
-        camera.set_control_value(svb.SVB_HARDWARE_BIN, hardware_bin)
-    except:
-        pass
-    camera.set_roi(bins=binning)
-    camera.start_video_capture()
-    camera.set_image_type(svb.SVB_IMG_RAW8)
-
-    try:
-        # Fix autogain
-        if autogain:
-            while True:
-                # Get frame
-                z = camera.capture_video_frame()
-
-                # Break on no change in gain
-                settings = camera.get_control_values()
-                if gain == settings["Gain"]:
-                    break
-                gain = settings["Gain"]
-                camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
-
-        # Loop until reaching end time
-        while float(time.time()) < tend:
-            # Wait for available capture buffer to become available
-            if (image_queue.qsize() > 1):
-                logger.warning("Acquiring data faster than your CPU can process")
-                slow_CPU = True
-            while (image_queue.qsize() > 1):
-                time.sleep(0.1)
-            if slow_CPU:
-                lost_video = time.time() - t
-                logger.info("Waited %.3fs for available capture buffer" % lost_video)
-                slow_CPU = False
-
-            # Get settings
-            try:
-                settings = camera.get_control_values()
-                gain = settings["Gain"]
-                temp = settings["Temperature"] / 10
-            except:
-                gain, temp = 0, 0
-            logger.info("Capturing frame with gain %d, temperature %.1f" % (gain, temp))
-
-            # Set gain
-            if autogain:
-                camera.set_control_value(svb.SVB_GAIN, gain, auto=autogain)
-
-            # Get frames
-            for i in range(nz):
-                # Store start time
-                t0 = float(time.time())
-
-                # Get frame
-                z = camera.capture_video_frame()
-
-                # Apply software binning
-                if software_bin > 1:
-                    my, mx = z.shape
-                    z = cv2.resize(z, (mx // software_bin, my // software_bin))
-                
-                # Compute mid time
-                t = (float(time.time()) + t0) / 2
-
-                # Display Frame
-                if live is True:
-                    cv2.imshow("Capture", z)
-                    cv2.waitKey(1)
-
-                # Store results
-                if first:
-                    z1[:, :, i] = z
-                    t1[i] = t
-                else:
-                    z2[:, :, i] = z
-                    t2[i] = t
-
-            if first: 
-                buf = 1
-            else:
-                buf = 2
-            image_queue.put(buf)
-            logger.debug("Captured buffer %d (%dx%dx%d)" % (buf, nx, ny, nz))
-
-            # Swap flag
-            first = not first
-        reason = "Session complete"
-    except KeyboardInterrupt:
-        print()
-        reason = "Keyboard interrupt"
-    except ValueError as e:
-        logger.error("%s" % e)
-        reason = "Wrong image dimensions? Fix nx, ny in config."
-    except MemoryError as e:
-        logger.error("Capture: Memory error %s" % e)
-    finally:
-        # End capture
-        logger.info("Capture: %s - Exiting" % reason)
-        camera.stop_video_capture()
-        camera.close()
-
-# SVBony Capture function.
-
-def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, device_id, live, conf_file):
-
-    camera_type = "SVB"
-    
-    global logger
-    logger = setup_logging(os.getcwd())
-
-    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
-    cfg.read(conf_file)
- 
-    from pysvb.camera import (PySVBCameraSDK, SVB_CONTROL_TYPE, SVB_IMG_TYPE, SVB_ROI_FORMAT,)
-
-    camera_sdk = PySVBCameraSDK()
- 
     first = True
     slow_CPU = False
 
-    z1 = np.ctypeslib.as_array(z1base.get_obj()).reshape(ny, nx, nz)
-    t1 = np.ctypeslib.as_array(t1base.get_obj())
-    z2 = np.ctypeslib.as_array(z2base.get_obj()).reshape(ny, nx, nz)
-    t2 = np.ctypeslib.as_array(t2base.get_obj())
+    # ------------------------------------------------------------
+    # Shared memory arrays
+    # ------------------------------------------------------------
 
-    # camera_id = cfg.getint(camera_type, "device_id")
-    gain = cfg.getint(camera_type, "gain")
-    autogain = cfg.getboolean(camera_type, "autogain")
-    exposure = cfg.getint(camera_type, "exposure")
-    binning = cfg.getint(camera_type, "bin")
-    brightness = cfg.getint(camera_type, "brightness", fallback=0)
-    software_bin = cfg.getint(camera_type, "software_bin", fallback=0)
+    z1 = np.ctypeslib.as_array(
+        z1base.get_obj()
+    ).reshape(ny, nx, nz)
 
+    t1 = np.ctypeslib.as_array(
+        t1base.get_obj()
+    )
 
+    z2 = np.ctypeslib.as_array(
+        z2base.get_obj()
+    ).reshape(ny, nx, nz)
 
-    # Maximum time get_video_data() waits for a frame.
+    t2 = np.ctypeslib.as_array(
+        t2base.get_obj()
+    )
+
+    # ------------------------------------------------------------
+    # SVBONY configuration
+    # ------------------------------------------------------------
+
+    camera_type = "SVB"
+
+    gain = cfg.getint(
+        camera_type,
+        "gain"
+    )
+
+    autogain = cfg.getboolean(
+        camera_type,
+        "autogain"
+    )
+
+    # Exposure is in microseconds
+    exposure = cfg.getint(
+        camera_type,
+        "exposure"
+    )
+
+    binning = cfg.getint(
+        camera_type,
+        "bin"
+    )
+
+    software_bin = cfg.getint(
+        camera_type,
+        "software_bin",
+        fallback=0
+    )
+
+    image_type_name = cfg.get(
+        camera_type,
+        "image_type",
+        fallback="Y16"
+    ).upper()
+
+    wait_ms = cfg.getint(
+        camera_type,
+        "wait_ms",
+        fallback=max(
+            1000,
+            int(exposure / 1000 * 2 + 500)
+        )
+    )
+
+    # ------------------------------------------------------------
+    # Select image type
     #
-    # If this is not specified, use approximately:
+    # This camera reports:
     #
-    # exposure * 2 + 500 ms
+    #   SVB_IMG_TYPE.SVB_IMG_Y8
+    #   SVB_IMG_TYPE.SVB_IMG_Y16
     #
-    wait_ms = cfg.getint(camera_type, "wait_ms", fallback=max(1000, int(exposure / 1000 * 2 + 500)))
+    # ------------------------------------------------------------
+
+    if image_type_name == "Y8":
+
+        image_type = SVB_IMG_TYPE.SVB_IMG_Y8
+        bytes_per_pixel = 1
+        numpy_dtype = np.uint8
+
+    elif image_type_name == "Y16":
+
+        image_type = SVB_IMG_TYPE.SVB_IMG_Y16
+        bytes_per_pixel = 2
+        numpy_dtype = np.uint16
+
+    else:
+
+        raise ValueError(
+            "Invalid SVBONY image_type '%s'. "
+            "Use Y8 or Y16."
+            % image_type_name
+        )
+
+    logger.info(
+        "Configured SVBONY image type: %s",
+        image_type
+    )
+
+    # ------------------------------------------------------------
+    # Initialize SVBONY SDK
+    # ------------------------------------------------------------
+
+    camera_sdk = PySVBCameraSDK()
 
     logger.info(
         "SVBONY SDK version: %s",
         camera_sdk.sdk_version
     )
 
-    num_cameras = camera_sdk.get_num_of_connected_cameras()
+    num_cameras = (
+        camera_sdk.get_num_of_connected_cameras()
+    )
 
     if num_cameras == 0:
-        logger.error("No SVBONY cameras found")
-        raise ValueError("No SVBONY cameras found")
 
-    cameras_found = []
-
-    for n in range(num_cameras):
-
-        info = camera_sdk.get_camera_info(n)
-
-        cameras_found.append(info)
-
-        logger.info(
-            "SVBONY camera %d: %s "
-            "(SN=%s, CameraID=%d)",
-            n,
-            info.FriendlyName,
-            info.CameraSN,
-            info.CameraID
+        logger.error(
+            "No SVBONY cameras found"
         )
 
+        raise ValueError(
+            "No SVBONY cameras found"
+        )
+
+    logger.info(
+        "Found %d SVBONY camera(s)",
+        num_cameras
+    )
+
+    # ------------------------------------------------------------
+    # Find camera
+    #
+    # device_id is the camera INDEX.
+    # CameraID is obtained from get_camera_info().
+    # ------------------------------------------------------------
+
     if device_id < 0 or device_id >= num_cameras:
+
         raise ValueError(
             "Invalid SVBONY device_id %d "
             "(%d cameras available)"
-            % (device_id, num_cameras)
+            % (
+                device_id,
+                num_cameras
+            )
         )
 
-    camera_id = cameras_found[device_id].CameraID
+    info = camera_sdk.get_camera_info(
+        device_id
+    )
 
     logger.info(
-        "Using SVBONY camera #%d: %s",
+        "SVBONY camera %d: %s",
         device_id,
-        cameras_found[device_id].FriendlyName
+        info.FriendlyName
     )
-
-    # Set image type
-
-    image_type_name = cfg.get(camera_type, "image_type", fallback="0")
-
-    if image_type_name in ("Y8", "RAW8"):
-        image_type = SVB_IMG_TYPE.SVB_IMG_Y8
-        bytes_per_pixel = 1
-
-    elif image_type_name in ("Y16", "RAW16"):
-        image_type = SVB_IMG_TYPE.SVB_IMG_Y16
-        bytes_per_pixel = 2
-
-    else:
-        raise ValueError(
-            "Unsupported SVBONY image_type: %s. "
-            "Use Y8 or Y16."
-            % image_type_name
-        )
 
     logger.info(
-        "Setting SVBONY image type to %s",
-        image_type
+        "CameraID=%s DeviceID=%s Serial=%s",
+        info.CameraID,
+        info.DeviceID,
+        info.CameraSN
     )
 
-    camera_sdk.set_output_image_type(
-        camera_id,
-        image_type
+    camera_id = info.CameraID
+
+    # ------------------------------------------------------------
+    # Open camera
+    # ------------------------------------------------------------
+
+    camera_sdk.open_camera(
+        camera_id
     )
-    
-    camera_sdk.open_camera(camera_id)
 
     try:
 
-        props = camera_sdk.get_camera_property(camera_id)
-
         logger.info(
-            "SVBONY camera: %s",
-            cameras_found[device_id].FriendlyName
+            "Opened SVBONY camera %d",
+            camera_id
+        )
+
+        # --------------------------------------------------------
+        # Camera properties
+        # --------------------------------------------------------
+
+        props = camera_sdk.get_camera_property(
+            camera_id
         )
 
         logger.info(
@@ -757,69 +670,52 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         )
 
         logger.info(
-            "Maximum bit depth: %d",
-            props.MaxBitDepth
-        )
-
-        logger.info(
-            "Supported bins: %s",
-            props.SupportedBins
-        )
-
-        logger.info(
             "Supported image types: %s",
             props.SupportedVideoFormat
         )
 
-        if nx > props.MaxWidth or ny > props.MaxHeight:
+        # --------------------------------------------------------
+        # Verify requested image type is supported
+        #
+        # Expected:
+        #
+        # [SVB_IMG_TYPE.SVB_IMG_Y8,
+        #  SVB_IMG_TYPE.SVB_IMG_Y16]
+        # --------------------------------------------------------
+
+        if image_type not in props.SupportedVideoFormat:
+
             raise ValueError(
-                "Requested image dimensions %dx%d exceed "
-                "SVBONY sensor size %dx%d"
+                "SVBONY camera does not support %s. "
+                "Supported image types: %s"
                 % (
-                    nx,
-                    ny,
-                    props.MaxWidth,
-                    props.MaxHeight
+                    image_type,
+                    props.SupportedVideoFormat
                 )
             )
 
-        if image_type_name == "RAW16":
-            image_type = SVB_IMG_TYPE.SVB_IMG_RAW16
-            bytes_per_pixel = 2
+        logger.info(
+            "Setting SVBONY image type to %s",
+            image_type
+        )
 
-        elif image_type_name == "RAW8":
-            image_type = SVB_IMG_TYPE.SVB_IMG_RAW8
-            bytes_per_pixel = 1
-
-        else:
-            raise ValueError(
-                "Unsupported SVBONY image_type: %s. "
-                "Use RAW8 or RAW16."
-                % image_type_name
-            )
-
-        if image_type not in props.SupportedVideoFormat:
-            raise ValueError(
-                "SVBONY camera does not support %s"
-                % image_type_name
-            )
+        # --------------------------------------------------------
+        # Set Y8 or Y16
+        # --------------------------------------------------------
 
         camera_sdk.set_output_image_type(
             camera_id,
             image_type
         )
 
+        logger.info(
+            "SVBONY image type set to %s",
+            image_type
+        )
+
         # --------------------------------------------------------
-        # Set ROI / binning
+        # Set ROI / hardware binning
         # --------------------------------------------------------
-        #
-        # SVBONY requires ROI width/height to obey camera-specific
-        # alignment constraints. The pysvb documentation states,
-        # for example, that width should be divisible by 8 and
-        # height by 2.
-        #
-        # Here we use the requested nx/ny dimensions.
-        #
 
         roi_format = SVB_ROI_FORMAT(
             0,
@@ -834,12 +730,18 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             roi_format
         )
 
-        current_roi = camera_sdk.get_roi_format(
-            camera_id
+        current_roi = (
+            camera_sdk.get_roi_format(
+                camera_id
+            )
         )
 
+        actual_nx = current_roi.width
+        actual_ny = current_roi.height
+
         logger.info(
-            "SVBONY ROI: x=%d y=%d width=%d height=%d bin=%d",
+            "SVBONY ROI: "
+            "x=%d y=%d width=%d height=%d bin=%d",
             current_roi.start_x,
             current_roi.start_y,
             current_roi.width,
@@ -847,14 +749,10 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             current_roi.bin
         )
 
-        # The actual image dimensions returned by the camera
-        # must agree with the shared-memory arrays.
-        actual_nx = current_roi.width
-        actual_ny = current_roi.height
-
         if actual_nx != nx or actual_ny != ny:
+
             raise ValueError(
-                "SVBONY returned ROI dimensions %dx%d, "
+                "SVBONY returned ROI %dx%d, "
                 "but shared memory expects %dx%d"
                 % (
                     actual_nx,
@@ -866,16 +764,20 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
         # --------------------------------------------------------
         # Set exposure
+        #
+        # SVBONY exposure is in microseconds.
         # --------------------------------------------------------
-        #
-        # pysvb expects exposure in microseconds.
-        #
 
         camera_sdk.set_control_value(
             camera_id,
             SVB_CONTROL_TYPE.SVB_EXPOSURE,
             exposure,
             False
+        )
+
+        logger.info(
+            "Exposure: %d us",
+            exposure
         )
 
         # --------------------------------------------------------
@@ -889,86 +791,15 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
             autogain
         )
 
-        # --------------------------------------------------------
-        # Optional brightness
-        # --------------------------------------------------------
-        #
-        # Brightness/auto-target behavior is not identical to ASI.
-        # Only set it if the camera exposes this control.
-        #
-
-        try:
-            camera_sdk.set_control_value(
-                camera_id,
-                SVB_CONTROL_TYPE.SVB_AUTO_TARGET_BRIGHTNESS,
-                brightness,
-                False
-            )
-        except Exception:
-            logger.debug(
-                "SVBONY AUTO_TARGET_BRIGHTNESS "
-                "not available on this camera"
-            )
+        logger.info(
+            "Gain: %d (auto=%s)",
+            gain,
+            autogain
+        )
 
         # --------------------------------------------------------
-        # Get actual gain/exposure values
+        # Determine frame buffer size
         # --------------------------------------------------------
-
-        try:
-            gain_value, gain_auto = (
-                camera_sdk.get_control_value(
-                    camera_id,
-                    SVB_CONTROL_TYPE.SVB_GAIN
-                )
-            )
-
-            exposure_value, exposure_auto = (
-                camera_sdk.get_control_value(
-                    camera_id,
-                    SVB_CONTROL_TYPE.SVB_EXPOSURE
-                )
-            )
-
-            logger.info(
-                "SVBONY settings: gain=%d "
-                "(auto=%s), exposure=%d us",
-                gain_value,
-                gain_auto,
-                exposure_value
-            )
-
-        except Exception as e:
-            logger.warning(
-                "Could not read gain/exposure: %s",
-                e
-            )
-
-        # --------------------------------------------------------
-        # Camera temperature
-        # --------------------------------------------------------
-
-        def get_temperature():
-
-            try:
-                temp_value, _ = camera_sdk.get_control_value(
-                    camera_id,
-                    SVB_CONTROL_TYPE.SVB_CURRENT_TEMPERATURE
-                )
-
-                return temp_value / 10.0
-
-            except Exception:
-                return 0.0
-
-        # --------------------------------------------------------
-        # Calculate capture buffer size
-        # --------------------------------------------------------
-        #
-        # pysvb documentation:
-        #
-        # RAW8  = width * height
-        # RAW16 = width * height * 2
-        #
 
         buffer_size = (
             actual_nx *
@@ -977,7 +808,18 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         )
 
         logger.info(
-            "SVBONY capture buffer size: %d bytes",
+            "Frame size: %dx%d",
+            actual_nx,
+            actual_ny
+        )
+
+        logger.info(
+            "Bytes per pixel: %d",
+            bytes_per_pixel
+        )
+
+        logger.info(
+            "Expected frame size: %d bytes",
             buffer_size
         )
 
@@ -985,19 +827,25 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         # Start video capture
         # --------------------------------------------------------
 
-        camera_sdk.start_video_capture(camera_id)
+        camera_sdk.start_video_capture(
+            camera_id
+        )
+
+        logger.info(
+            "SVBONY video capture started"
+        )
 
         reason = "Session complete"
 
-        # --------------------------------------------------------
+        # ========================================================
         # Main acquisition loop
-        # --------------------------------------------------------
+        # ========================================================
 
         while float(time.time()) < tend:
 
-            # --------------------------------------------
+            # ----------------------------------------------------
             # Check processing queue
-            # --------------------------------------------
+            # ----------------------------------------------------
 
             if image_queue.qsize() > 1:
 
@@ -1009,6 +857,7 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                 slow_CPU = True
 
             while image_queue.qsize() > 1:
+
                 time.sleep(0.1)
 
             if slow_CPU:
@@ -1020,9 +869,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
                 slow_CPU = False
 
-            # --------------------------------------------
-            # Read camera settings
-            # --------------------------------------------
+            # ----------------------------------------------------
+            # Read current gain
+            # ----------------------------------------------------
 
             try:
 
@@ -1037,30 +886,46 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
                 gain_value = 0
 
-            temp = get_temperature()
+            # ----------------------------------------------------
+            # Read temperature
+            # ----------------------------------------------------
+
+            try:
+
+                temp_value, temp_auto = (
+                    camera_sdk.get_control_value(
+                        camera_id,
+                        SVB_CONTROL_TYPE.SVB_CURRENT_TEMPERATURE
+                    )
+                )
+
+                temp = temp_value / 10.0
+
+            except Exception:
+
+                temp = 0.0
 
             logger.info(
-                "Capturing SVBONY frames: "
-                "gain=%d, temperature=%.1f C",
+                "Capturing frame with gain %d, "
+                "temperature %.1f C",
                 gain_value,
                 temp
             )
 
-            # --------------------------------------------
+            # ----------------------------------------------------
             # Capture nz frames
-            # --------------------------------------------
+            # ----------------------------------------------------
 
             for i in range(nz):
 
-                # Start timestamp
-                t0 = float(time.time())
+                # Start time
+                t0 = float(
+                    time.time()
+                )
 
-                # ----------------------------------------
-                # Get frame from SVBONY
-                # ----------------------------------------
-                #
-                # get_video_data() returns bytes.
-                #
+                # ------------------------------------------------
+                # Get frame
+                # ------------------------------------------------
 
                 data = camera_sdk.get_video_data(
                     camera_id,
@@ -1068,42 +933,24 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                     wait_ms
                 )
 
-                # --------------------------------------------------------
-                # Convert SVBONY frame to NumPy array
-                # --------------------------------------------------------
+                # ------------------------------------------------
+                # Convert byte buffer to NumPy array
+                # ------------------------------------------------
 
-                if image_type == SVB_IMG_TYPE.SVB_IMG_Y8:
-
-                    z = np.frombuffer(
-                        data,
-                        dtype=np.uint8
-                    )
-
-                elif image_type == SVB_IMG_TYPE.SVB_IMG_Y16:
-
-                    z = np.frombuffer(
-                        data,
-                        dtype=np.uint16
-                    )
-
-                else:
-                    raise ValueError(
-                        "Unsupported SVBONY image type: %s"
-                        % image_type
-                    )
-
-                # ----------------------------------------
-                # Check image size
-                # ----------------------------------------
+                z = np.frombuffer(
+                    data,
+                    dtype=numpy_dtype
+                )
 
                 expected_pixels = (
-                    actual_nx * actual_ny
+                    actual_nx *
+                    actual_ny
                 )
 
                 if z.size < expected_pixels:
 
                     raise ValueError(
-                        "SVBONY returned only %d pixels; "
+                        "SVBONY returned %d pixels, "
                         "expected %d"
                         % (
                             z.size,
@@ -1111,24 +958,24 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                         )
                     )
 
-                # Ignore any padding at the end of the
-                # returned buffer.
+                # Ignore possible trailing data
                 z = z[:expected_pixels]
 
+                # Convert to 2D image
                 z = z.reshape(
                     actual_ny,
                     actual_nx
                 )
 
-                # Make a writable/independent array.
+                # Make independent array
                 z = np.array(
                     z,
                     copy=True
                 )
 
-                # ----------------------------------------
-                # Optional software binning
-                # ----------------------------------------
+                # ------------------------------------------------
+                # Software binning
+                # ------------------------------------------------
 
                 if software_bin > 1:
 
@@ -1143,24 +990,23 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                         interpolation=cv2.INTER_AREA
                     )
 
-                # ----------------------------------------
+                # ------------------------------------------------
                 # Timestamp
-                # ----------------------------------------
+                # ------------------------------------------------
 
                 t = (
-                    float(time.time()) + t0
+                    float(time.time()) +
+                    t0
                 ) / 2.0
 
-                # ----------------------------------------
+                # ------------------------------------------------
                 # Live display
-                # ----------------------------------------
+                # ------------------------------------------------
 
                 if live is True:
 
                     display = z
 
-                    # OpenCV generally displays uint16
-                    # images poorly without normalization.
                     if display.dtype == np.uint16:
 
                         display = cv2.normalize(
@@ -1178,9 +1024,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
                     cv2.waitKey(1)
 
-                # ----------------------------------------
-                # Store in shared-memory buffer
-                # ----------------------------------------
+                # ------------------------------------------------
+                # Store image
+                # ------------------------------------------------
 
                 if first:
 
@@ -1192,13 +1038,16 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                     z2[:, :, i] = z
                     t2[i] = t
 
-            # --------------------------------------------
-            # Signal that a complete buffer is ready
-            # --------------------------------------------
+            # ----------------------------------------------------
+            # Tell processing process which buffer is ready
+            # ----------------------------------------------------
 
             if first:
+
                 buf = 1
+
             else:
+
                 buf = 2
 
             image_queue.put(buf)
@@ -1211,15 +1060,11 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
                 nz
             )
 
-            # --------------------------------------------
-            # Switch buffer
-            # --------------------------------------------
+            # ----------------------------------------------------
+            # Swap buffers
+            # ----------------------------------------------------
 
             first = not first
-
-        # ------------------------------------------------
-        # End acquisition
-        # ------------------------------------------------
 
         reason = "Session complete"
 
@@ -1261,9 +1106,9 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
 
     finally:
 
-        # ------------------------------------------------
-        # Stop capture and close camera
-        # ------------------------------------------------
+        # --------------------------------------------------------
+        # Stop capture
+        # --------------------------------------------------------
 
         logger.info(
             "SVBONY Capture: %s - Exiting",
@@ -1271,17 +1116,27 @@ def capture_svb(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         )
 
         try:
+
             camera_sdk.stop_video_capture(
                 camera_id
             )
+
         except Exception:
+
             pass
 
+        # --------------------------------------------------------
+        # Close camera
+        # --------------------------------------------------------
+
         try:
+
             camera_sdk.close_camera(
                 camera_id
             )
+
         except Exception:
+
             pass
 
 
