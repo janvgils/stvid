@@ -431,7 +431,7 @@ def capture_asi(image_queue, z1base, t1base, z2base, t2base, nx, ny, nz, tend, d
         camera.stop_video_capture()
         camera.close()
 
-# Capture images from SVBony
+# Define SVBony Capture function
 
 def capture_svb(
         image_queue,
@@ -697,20 +697,6 @@ def capture_svb(
         logger.info(
             "Setting SVBONY image type to %s",
             image_type
-        )
-
-        # --------------------------------------------------------
-        # Set auto_save_param false
-        # --------------------------------------------------------
-
-        camera_sdk.set_autosave_param(
-            camera_id,
-            False
-        )
-
-        logger.info(
-            "SVBONY autosave set to %s",
-            false
         )
 
         # --------------------------------------------------------
