@@ -39,17 +39,12 @@ nx = 640                # Camera horizontal pixel count
 ny = 480                # Camera vertical pixel count
 nframes = 100           # Number of frames for each image
 gain = 100              # Camera gain
-maxgain = 300           # Maximum gain (for autogain; starts at gain)
-autogain = false        # Use autogain
-exposure = 3000         # Exposure time in microseconds
-brightness = 0          # Target brightness of pixels
-bandwidth = 90          # Bandwidth usage (percent)
-high_speed = 0          # High speed mode (0 for False, 1 for True)
-hardware_bin = 0        # Hardware binning (0 for False, 1 for True)
-bin = 1                 # ASI software binning factor (1: 1x2, 2: 2x2 etc)
+autogain = false
+exposure = 10000        # Exposure time in microseconds
+bin = 1                 # Software binning factor
 software_bin = 0        # STVID software binning factor (1: 1x1, 2: 2x2 etc)
-image_type = Y16        # Y8 or Y16
-wait_ms = 1000          # Timeout for get_video_data(), milliseconds
+image_type = Y16        # Image type Y8 or Y16 for SV305M Pro
+wait_ms = 1000
 
 [PI]
 device_id = 0           # Device ID
