@@ -999,8 +999,7 @@ def _capture_svb_buffer(zbase, tbase, nx, ny, nz,
 
         # Encourage Python to release temporary objects before the
         # worker exits. The worker exit itself is the important part.
-        gc.collect()
-
+        
         logger.info(
             "SVB worker buffer=%d exiting",
             buffer_number
