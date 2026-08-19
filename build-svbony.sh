@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# ./build-svbony.sh software/SVBCameraSDK
+
 set -e
 
 if [ "$#" -ne 1 ]; then
