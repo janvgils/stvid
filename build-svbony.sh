@@ -55,6 +55,8 @@ gcc \
     -I"$SDK/include" \
     -L"$SDK_LIB" \
     -Wl,-rpath,"$SDK_LIB" \
+    -Wl,-rpath-link,"$SDK_LIB" \
+    -Wl,--no-as-needed \
     -o stvid/libstvid_svbony.so \
     stvid/svbony_sdk.c \
     -lSVBCameraSDK \
