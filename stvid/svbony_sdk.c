@@ -160,12 +160,12 @@ int stvid_svbony_open(
      */
     result = SVBSetOutputImageType(
         camera_id,
-        SVB_IMG_RAW8
+        SVB_IMG_Y8
     );
 
     fprintf(
         stderr,
-        "SVBONY: SVBSetOutputImageType(RAW8) = %d\n",
+        "SVBONY: SVBSetOutputImageType(Y8) = %d\n",
         result
     );
 
