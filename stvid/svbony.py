@@ -65,20 +65,20 @@ class SVBonyCamera:
         # ---------------------------------------------------------
 
         self.lib.stvid_svbony_open.argtypes = [
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_long,
-            ctypes.c_long,
+            ctypes.c_int,      # camera index
+            ctypes.c_int,      # width
+            ctypes.c_int,      # height
+            ctypes.c_long,     # exposure
+            ctypes.c_long,     # gain
         ]
 
         self.lib.stvid_svbony_open.restype = ctypes.c_int
 
         self.lib.stvid_svbony_get_frame.argtypes = [
-            ctypes.c_int,
+            ctypes.c_int,      # camera index
             ctypes.POINTER(ctypes.c_ubyte),
-            ctypes.c_long,
-            ctypes.c_int,
+            ctypes.c_long,     # buffer size
+            ctypes.c_int,      # timeout
         ]
 
         self.lib.stvid_svbony_get_frame.restype = ctypes.c_int

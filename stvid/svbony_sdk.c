@@ -5,39 +5,81 @@
 
 
 /*
- * Return values exposed to Python.
+ * The Python/API-facing camera number is the connected-camera index.
  *
- * 0 = success
- * non-zero = SVBONY SDK error
+ * SVBONY uses two identifiers:
+ *
+ *   index    : 0, 1, ... used by SVBGetCameraInfo()
+ *   CameraID : actual SDK ID used by all other camera operations
+ *
+ * Keep the conversion inside this C wrapper so Python does not need
+ * to know about this SDK peculiarity.
  */
+static int get_camera_id(int camera_index)
+{
+    SVB_CAMERA_INFO info;
+    SVB_ERROR_CODE result;
+
+    result = SVBGetCameraInfo(
+        &info,
+        camera_index
+    );
+
+    if (result != SVB_SUCCESS)
+        return -1;
+
+    return info.CameraID;
+}
 
 
 /*
- * Open and configure camera.
+ * Return the number of connected SVBONY cameras.
+ */
+int stvid_svbony_num_cameras(void)
+{
+    return SVBGetNumOfConnectedCameras();
+}
+
+
+/*
+ * Open and configure a camera.
  *
- * SV305M Pro:
- *   1920 x 1080
- *   monochrome
- *   RAW8
+ * camera_index is the connected-camera index, NOT CameraID.
  */
 int stvid_svbony_open(
-    int camera_id,
+    int camera_index,
     int width,
     int height,
     long exposure,
     long gain)
 {
-    int result;
+    int camera_id;
+    SVB_ERROR_CODE result;
 
-    int cameras = SVBGetNumOfConnectedCameras();
+    camera_id = get_camera_id(camera_index);
 
-    if (cameras <= 0)
-        return -1000;
+    fprintf(
+        stderr,
+        "SVBONY: camera index %d -> CameraID %d\n",
+        camera_index,
+        camera_id
+    );
 
-    if (camera_id < 0 || camera_id >= cameras)
-        return -1001;
+    if (camera_id < 0)
+        return SVB_ERROR_INVALID_INDEX;
 
+
+    /*
+     * Open camera.
+     */
     result = SVBOpenCamera(camera_id);
+
+    fprintf(
+        stderr,
+        "SVBONY: SVBOpenCamera(%d) = %d\n",
+        camera_id,
+        result
+    );
 
     if (result != SVB_SUCCESS)
         return result;
@@ -45,11 +87,6 @@ int stvid_svbony_open(
 
     /*
      * Set ROI.
-     *
-     * x = 0
-     * y = 0
-     * width/height = configured STVID frame
-     * binning = 1
      */
     result = SVBSetROIFormat(
         camera_id,
@@ -60,31 +97,31 @@ int stvid_svbony_open(
         1
     );
 
+    fprintf(
+        stderr,
+        "SVBONY: SVBSetROIFormat(%d, %d, %d) = %d\n",
+        width,
+        height,
+        1,
+        result
+    );
+
     if (result != SVB_SUCCESS)
         goto error_close;
 
 
     /*
-     * Normal continuous capture mode.
+     * Normal video mode.
      */
     result = SVBSetCameraMode(
         camera_id,
         SVB_MODE_NORMAL
     );
 
-    if (result != SVB_SUCCESS)
-        goto error_close;
-
-
-    /*
-     * SV305M Pro is monochrome.
-     *
-     * RAW8 gives one byte per pixel and therefore fits
-     * directly into the existing STVID uint8 shared buffers.
-     */
-    result = SVBSetOutputImageType(
-        camera_id,
-        SVB_IMG_RAW8
+    fprintf(
+        stderr,
+        "SVBONY: SVBSetCameraMode(NORMAL) = %d\n",
+        result
     );
 
     if (result != SVB_SUCCESS)
@@ -92,7 +129,27 @@ int stvid_svbony_open(
 
 
     /*
-     * Manual exposure.
+     * We want monochrome 8-bit frames.
+     */
+    result = SVBSetOutputImageType(
+        camera_id,
+        SVB_IMG_RAW8
+    );
+
+    fprintf(
+        stderr,
+        "SVBONY: SVBSetOutputImageType(RAW8) = %d\n",
+        result
+    );
+
+    if (result != SVB_SUCCESS)
+        goto error_close;
+
+
+    /*
+     * Exposure.
+     *
+     * The SDK uses long for the value.
      */
     result = SVBSetControlValue(
         camera_id,
@@ -101,12 +158,19 @@ int stvid_svbony_open(
         SVB_FALSE
     );
 
+    fprintf(
+        stderr,
+        "SVBONY: SVBSetControlValue(EXPOSURE, %ld) = %d\n",
+        exposure,
+        result
+    );
+
     if (result != SVB_SUCCESS)
         goto error_close;
 
 
     /*
-     * Manual gain.
+     * Gain.
      */
     result = SVBSetControlValue(
         camera_id,
@@ -115,16 +179,15 @@ int stvid_svbony_open(
         SVB_FALSE
     );
 
+    fprintf(
+        stderr,
+        "SVBONY: SVBSetControlValue(GAIN, %ld) = %d\n",
+        gain,
+        result
+    );
+
     if (result != SVB_SUCCESS)
         goto error_close;
-
-
-    /*
-     * Disable automatic parameter persistence.
-     *
-     * STVID should control the acquisition explicitly.
-     */
-    SVBSetAutoSaveParam(camera_id, SVB_FALSE);
 
 
     /*
@@ -132,15 +195,28 @@ int stvid_svbony_open(
      */
     result = SVBStartVideoCapture(camera_id);
 
+    fprintf(
+        stderr,
+        "SVBONY: SVBStartVideoCapture() = %d\n",
+        result
+    );
+
     if (result != SVB_SUCCESS)
         goto error_close;
 
-    return 0;
+
+    fprintf(
+        stderr,
+        "SVBONY: camera successfully configured\n"
+    );
+
+    return SVB_SUCCESS;
 
 
 error_close:
 
     SVBCloseCamera(camera_id);
+
     return result;
 }
 
@@ -149,11 +225,18 @@ error_close:
  * Get one frame.
  */
 int stvid_svbony_get_frame(
-    int camera_id,
-    void *buffer,
+    int camera_index,
+    unsigned char *buffer,
     long buffer_size,
     int timeout_ms)
 {
+    int camera_id;
+
+    camera_id = get_camera_id(camera_index);
+
+    if (camera_id < 0)
+        return SVB_ERROR_INVALID_INDEX;
+
     return SVBGetVideoData(
         camera_id,
         buffer,
@@ -164,10 +247,17 @@ int stvid_svbony_get_frame(
 
 
 /*
- * Stop streaming.
+ * Stop video capture.
  */
-int stvid_svbony_stop(int camera_id)
+int stvid_svbony_stop(int camera_index)
 {
+    int camera_id;
+
+    camera_id = get_camera_id(camera_index);
+
+    if (camera_id < 0)
+        return SVB_ERROR_INVALID_INDEX;
+
     return SVBStopVideoCapture(camera_id);
 }
 
@@ -175,29 +265,36 @@ int stvid_svbony_stop(int camera_id)
 /*
  * Close camera.
  */
-int stvid_svbony_close(int camera_id)
+int stvid_svbony_close(int camera_index)
 {
+    int camera_id;
+
+    camera_id = get_camera_id(camera_index);
+
+    if (camera_id < 0)
+        return SVB_ERROR_INVALID_INDEX;
+
     return SVBCloseCamera(camera_id);
-}
-
-
-/*
- * Number of connected cameras.
- */
-int stvid_svbony_num_cameras(void)
-{
-    return SVBGetNumOfConnectedCameras();
 }
 
 
 /*
  * Number of dropped frames.
  */
-int stvid_svbony_dropped_frames(int camera_id)
+int stvid_svbony_dropped_frames(int camera_index)
 {
+    int camera_id;
     int dropped = 0;
 
-    if (SVBGetDroppedFrames(camera_id, &dropped) != SVB_SUCCESS)
+    camera_id = get_camera_id(camera_index);
+
+    if (camera_id < 0)
+        return -1;
+
+    if (SVBGetDroppedFrames(
+            camera_id,
+            &dropped
+        ) != SVB_SUCCESS)
         return -1;
 
     return dropped;
