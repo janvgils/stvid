@@ -1,24 +1,36 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
 #include "SVBCameraSDK.h"
 
 
+#define STVID_SVBONY_MAX_CAMERAS 16
+
+
 /*
- * The Python/API-facing camera number is the connected-camera index.
+ * SVBONY distinguishes between:
  *
- * SVBONY uses two identifiers:
+ *   camera index = position in the connected-camera list
+ *   CameraID     = actual SDK camera identifier
  *
- *   index    : 0, 1, ... used by SVBGetCameraInfo()
- *   CameraID : actual SDK ID used by all other camera operations
- *
- * Keep the conversion inside this C wrapper so Python does not need
- * to know about this SDK peculiarity.
+ * We resolve the CameraID once when opening the camera and cache it.
+ * We must NOT call SVBGetCameraInfo() for every video frame.
+ */
+static int camera_ids[STVID_SVBONY_MAX_CAMERAS];
+static int camera_open[STVID_SVBONY_MAX_CAMERAS];
+
+
+/*
+ * Convert connected-camera index to SVBONY CameraID.
  */
 static int get_camera_id(int camera_index)
 {
     SVB_CAMERA_INFO info;
     SVB_ERROR_CODE result;
+
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
+        return -1;
 
     result = SVBGetCameraInfo(
         &info,
@@ -33,7 +45,7 @@ static int get_camera_id(int camera_index)
 
 
 /*
- * Return the number of connected SVBONY cameras.
+ * Number of connected cameras.
  */
 int stvid_svbony_num_cameras(void)
 {
@@ -42,9 +54,7 @@ int stvid_svbony_num_cameras(void)
 
 
 /*
- * Open and configure a camera.
- *
- * camera_index is the connected-camera index, NOT CameraID.
+ * Open and configure camera.
  */
 int stvid_svbony_open(
     int camera_index,
@@ -56,6 +66,14 @@ int stvid_svbony_open(
     int camera_id;
     SVB_ERROR_CODE result;
 
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
+        return SVB_ERROR_INVALID_INDEX;
+
+
+    /*
+     * Resolve CameraID exactly once.
+     */
     camera_id = get_camera_id(camera_index);
 
     fprintf(
@@ -86,6 +104,16 @@ int stvid_svbony_open(
 
 
     /*
+     * Cache CameraID.
+     *
+     * From this point on all video operations use the cached ID
+     * and do NOT call SVBGetCameraInfo() again.
+     */
+    camera_ids[camera_index] = camera_id;
+    camera_open[camera_index] = 1;
+
+
+    /*
      * Set ROI.
      */
     result = SVBSetROIFormat(
@@ -99,10 +127,9 @@ int stvid_svbony_open(
 
     fprintf(
         stderr,
-        "SVBONY: SVBSetROIFormat(%d, %d, %d) = %d\n",
+        "SVBONY: SVBSetROIFormat(%d, %d, 1) = %d\n",
         width,
         height,
-        1,
         result
     );
 
@@ -129,7 +156,7 @@ int stvid_svbony_open(
 
 
     /*
-     * We want monochrome 8-bit frames.
+     * RAW8 output.
      */
     result = SVBSetOutputImageType(
         camera_id,
@@ -148,8 +175,6 @@ int stvid_svbony_open(
 
     /*
      * Exposure.
-     *
-     * The SDK uses long for the value.
      */
     result = SVBSetControlValue(
         camera_id,
@@ -191,7 +216,7 @@ int stvid_svbony_open(
 
 
     /*
-     * Start streaming.
+     * Start capture.
      */
     result = SVBStartVideoCapture(camera_id);
 
@@ -215,6 +240,9 @@ int stvid_svbony_open(
 
 error_close:
 
+    camera_open[camera_index] = 0;
+    camera_ids[camera_index] = 0;
+
     SVBCloseCamera(camera_id);
 
     return result;
@@ -223,6 +251,10 @@ error_close:
 
 /*
  * Get one frame.
+ *
+ * IMPORTANT:
+ * Use the cached CameraID.
+ * Do not call SVBGetCameraInfo() while capturing.
  */
 int stvid_svbony_get_frame(
     int camera_index,
@@ -232,10 +264,17 @@ int stvid_svbony_get_frame(
 {
     int camera_id;
 
-    camera_id = get_camera_id(camera_index);
-
-    if (camera_id < 0)
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
         return SVB_ERROR_INVALID_INDEX;
+
+    if (!camera_open[camera_index])
+        return SVB_ERROR_CAMERA_CLOSED;
+
+    if (buffer == NULL)
+        return SVB_ERROR_BUFFER_TOO_SMALL;
+
+    camera_id = camera_ids[camera_index];
 
     return SVBGetVideoData(
         camera_id,
@@ -247,18 +286,24 @@ int stvid_svbony_get_frame(
 
 
 /*
- * Stop video capture.
+ * Stop capture.
  */
 int stvid_svbony_stop(int camera_index)
 {
     int camera_id;
 
-    camera_id = get_camera_id(camera_index);
-
-    if (camera_id < 0)
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
         return SVB_ERROR_INVALID_INDEX;
 
-    return SVBStopVideoCapture(camera_id);
+    if (!camera_open[camera_index])
+        return SVB_ERROR_CAMERA_CLOSED;
+
+    camera_id = camera_ids[camera_index];
+
+    return SVBStopVideoCapture(
+        camera_id
+    );
 }
 
 
@@ -268,13 +313,25 @@ int stvid_svbony_stop(int camera_index)
 int stvid_svbony_close(int camera_index)
 {
     int camera_id;
+    SVB_ERROR_CODE result;
 
-    camera_id = get_camera_id(camera_index);
-
-    if (camera_id < 0)
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
         return SVB_ERROR_INVALID_INDEX;
 
-    return SVBCloseCamera(camera_id);
+    if (!camera_open[camera_index])
+        return SVB_SUCCESS;
+
+    camera_id = camera_ids[camera_index];
+
+    result = SVBCloseCamera(
+        camera_id
+    );
+
+    camera_open[camera_index] = 0;
+    camera_ids[camera_index] = 0;
+
+    return result;
 }
 
 
@@ -286,10 +343,14 @@ int stvid_svbony_dropped_frames(int camera_index)
     int camera_id;
     int dropped = 0;
 
-    camera_id = get_camera_id(camera_index);
-
-    if (camera_id < 0)
+    if (camera_index < 0 ||
+        camera_index >= STVID_SVBONY_MAX_CAMERAS)
         return -1;
+
+    if (!camera_open[camera_index])
+        return -1;
+
+    camera_id = camera_ids[camera_index];
 
     if (SVBGetDroppedFrames(
             camera_id,
