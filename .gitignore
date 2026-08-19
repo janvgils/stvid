@@ -9,3 +9,5 @@ settings.json
 
 # Configuration files
 *.ini
+
+stvid/libstvid_svbony.so
