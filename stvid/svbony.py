@@ -24,7 +24,23 @@ class SVBonyCamera:
         self.height = height
         self.timeout = timeout
 
-        self.lib = ctypes.CDLL(library)
+        libusb = ctypes.util.find_library("usb-1.0")
+
+        if libusb is None:
+            raise RuntimeError(
+                "libusb-1.0 could not be found. "
+                "Install libusb-1.0."
+           )
+
+       ctypes.CDLL(
+           libusb,
+           mode=ctypes.RTLD_GLOBAL
+       )
+
+       self.lib = ctypes.CDLL(
+           library,
+           mode=ctypes.RTLD_GLOBAL
+       )
 
         self.lib.stvid_svbony_open.argtypes = [
             ctypes.c_int,
